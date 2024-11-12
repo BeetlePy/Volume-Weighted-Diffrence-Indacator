@@ -6,25 +6,36 @@ window = input.int(21, "Window Length", minval=1)
 length_rsi = input.int(14, "RSI Length", minval=1)
 timeframe = input.timeframe("3", "Lower Timeframe for Volume")
 timeframe_lookback_period = input.int(5, "Lookback window for lower TF")
-float buying_volume = 0
-float selling_volume = 0
 
-// 2. Volume Calculations from Lower Timeframe
+float buying_volume = 0.0
+float selling_volume = 0.0
+
 // Get volume data from lower timeframe
 [lower_close, lower_open, lower_high, lower_low, lower_volume] = request.security_lower_tf(syminfo.tickerid, timeframe, [close, open, high, low, volume])
 
 // Calculate buying and selling volume based on price action in lower timeframe
-// Sum up volume from last x bars in lower timeframe 
 for i = 0 to timeframe_lookback_period
-    if array.size(lower_volume) > i and array.size(lower_close) > i and array.size(lower_high) > i and array.size(lower_low) > i
-        buying_volume += array.get(lower_volume, i) * (array.get(lower_close, i) - array.get(lower_low, i))/(array.get(lower_high, i) - array.get(lower_low, i))
-        selling_volume += array.get(lower_volume, i) * (array.get(lower_high, i) - array.get(lower_close, i))/(array.get(lower_high, i) - array.get(lower_low, i))
+    if array.size(lower_volume) > i and array.size(lower_close) > i and array.size(lower_open) > i
+        // Get values for current lower timeframe bar
+        float curr_volume = array.get(lower_volume, i)
+        float curr_close = array.get(lower_close, i)
+        float curr_open = array.get(lower_open, i)
+        
+        // Determine if bar is bullish or bearish
+        if curr_close >= curr_open
+            // Bullish bar - assign more volume to buyers
+            buying_volume += curr_volume * 0.7
+            selling_volume += curr_volume * 0.3
+        else
+            // Bearish bar - assign more volume to sellers
+            buying_volume += curr_volume * 0.3
+            selling_volume += curr_volume * 0.7
 
 // Aggregate volume pressure 
-float volume_pressure = (buying_volume - selling_volume)/(buying_volume + selling_volume)
+float volume_pressure = (buying_volume - selling_volume) / (buying_volume + selling_volume)
 float volume_strength = ta.sma(math.abs(volume_pressure), length_sma)
 
-// 3. Indicator Calculations
+// Indicator Calculations
 sma14 = ta.sma(close, length_sma)
 ema7 = ta.ema(close, length_ema)
 madif = ((sma14 - ema7) / ema7) * 100
@@ -37,21 +48,19 @@ rsi = ta.rsi(close, length_rsi)
 rsi_mean = ta.sma(rsi, length_rsi)
 rsi_std = ta.stdev(rsi, length_rsi)
 
-// 4. Thresholds
+// Thresholds
 long_threshold = rolling_mean + 2 * rolling_std
 short_threshold = rolling_mean - 2 * rolling_std
 
-// 5. Plotting
+// Plotting
 plot(vwd, title="VWD", color=color.blue, linewidth=2)
 plot(rolling_mean, title="VWD Mean", color=color.yellow, linewidth=1)
 plot(long_threshold, title="VWD Upper Std Dev", color=color.red, linewidth=1)
 plot(short_threshold, title="VWD Lower Std Dev", color=color.green, linewidth=1)
-//plot background color if rsi is > or < +/- 1.5 std
+// Plot background color if RSI is > or < +/- 1.5 std
 bgcolor(rsi > rsi_mean + 1.5 * rsi_std ? color.new(color.red, 90) : na)
 bgcolor(rsi < rsi_mean - 1.5 * rsi_std ? color.new(color.green, 90) : na)
 
-// 6. Plot Shapes with Combined Conditions
+// Plot Shapes with Combined Conditions
 plotshape(series=(vwd > long_threshold) and (rsi < rsi_mean - rsi_std), location=location.belowbar, color=color.green, style=shape.triangleup, title="Bullish Signal", size=size.small, force_overlay=true, offset=1)
-
-// Red triangle when VWD is below its lower band and RSI is above the upper RSI threshold
 plotshape(series=(vwd < short_threshold) and (rsi > rsi_mean + rsi_std), location=location.abovebar, color=color.red, style=shape.triangledown, title="Bearish Signal", size=size.small, force_overlay=true, offset=1)
