@@ -1,0 +1,59 @@
+//@version=5
+indicator(title="Volume Weighted Difference", shorttitle="VWD", overlay=false)
+
+// ==========================
+// 1. Input Parameters
+// ==========================
+length_sma = 14
+length_ema = 7
+window = 21
+length_rsi = 14
+
+// ==========================
+// 2. Indicator Calculations
+// ==========================
+volume_lag1 = ta.valuewhen(close, volume[1], 1)
+volumechange = volume / ta.sma(volume, length_sma) - 1
+
+sma14 = ta.sma(close, length_sma)
+ema7 = ta.ema(close, length_ema)
+
+madif = ((sma14 - ema7) / ema7) * 10
+vwd = madif * volumechange * 1
+
+rolling_mean = ta.sma(vwd, window)
+rolling_std = ta.stdev(vwd, window)
+
+rsi = ta.rsi(close, length_rsi)
+rsi_mean = ta.sma(rsi, length_rsi)
+rsi_std = ta.stdev(rsi, length_rsi)
+
+// ==========================
+// 3. Thresholds
+// ==========================
+long_threshold = rolling_mean + 2 * rolling_std
+short_threshold = rolling_mean - 2 * rolling_std
+
+// ==========================
+// 4. Plotting
+// ==========================
+plot(vwd, title="VWD", color=color.blue, linewidth=2)
+plot(rolling_mean, title="VWD Mean", color=color.yellow, linewidth=1)
+plot(long_threshold, title="VWD Upper Std Dev", color=color.red, linewidth=1)
+plot(short_threshold, title="VWD Lower Std Dev", color=color.green, linewidth=1)
+
+bgcolor(rsi > rsi_mean + 1.5 * rsi_std ? color.new(color.red, 90) : na)
+bgcolor(rsi < rsi_mean - 1.5 * rsi_std ? color.new(color.green, 90) : na)
+
+// ==========================
+// 5. Plot Shapes with Combined Conditions
+// ==========================
+// Green triangle when VWD is above its upper band and RSI is below the lower RSI threshold
+plotshape(series=(vwd > long_threshold) and (rsi < rsi_mean - rsi_std), location=location.belowbar, color=color.green, style=shape.triangleup, title="Bullish Signal", size=size.small, force_overlay=true, offset=1)
+
+// Red triangle when VWD is below its lower band and RSI is above the upper RSI threshold
+plotshape(series=(vwd < short_threshold) and (rsi > rsi_mean + rsi_std), location=location.abovebar, color=color.red, style=shape.triangledown, title="Bearish Signal", size=size.small, force_overlay=true, offset=1)
+
+// ==========================
+// 6. Alerts (Optional)
+// ==========================
