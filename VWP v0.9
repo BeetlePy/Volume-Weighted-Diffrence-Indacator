@@ -1,0 +1,33 @@
+//@version=5
+indicator("Volume Weighted Difference (VWD)", overlay=false)
+
+// Parameters
+length_sma = 14
+length_ema = 7
+window = 21
+
+// Get the data
+volume_lag1 = ta.valuewhen(close, volume[1], 1)
+volumechange = na(volume_lag1) ? na : (volume > volume_lag1 ? (volume / volume_lag1) * 1 : (volume / volume_lag1) * -1)
+
+// Calculate SMA and EMA
+sma14 = ta.sma(close, length_sma)
+ema7 = ta.ema(close, length_ema)
+
+// Calculate MADIF and VWD
+madif = ((sma14 - ema7) / ema7) * 100
+vwd = madif * volumechange * 10
+
+// Calculate rolling mean and standard deviation of VWD
+rolling_mean = ta.sma(vwd, window)
+rolling_std = ta.stdev(vwd, window)
+
+// Entry thresholds
+long_threshold = rolling_mean + 3 * rolling_std
+short_threshold = rolling_mean - 3 * rolling_std
+
+// Plot VWD in Subplot
+plot(vwd, title="VWD", color=color.blue, linewidth=2)
+hline(0, "Zero Line", color=color.gray, linestyle=hline.style_dotted)
+plot(long_threshold, title="Long Threshold", color=color.green, linewidth=1, style=plot.style_line)
+plot(short_threshold, title="Short Threshold", color=color.red, linewidth=1, style=plot.style_line)
